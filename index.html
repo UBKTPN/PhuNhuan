@@ -125,7 +125,7 @@ tbody tr:hover{background:var(--gold-soft);}
 .stack-row:nth-child(even){background:var(--paper-2);}
 
 .card-grid .card:nth-child(even){background:var(--paper-2);}
-.staff-grid .staff-card:nth-child(even){background:var(--paper-2);}
+.staff-row .staff-card:nth-child(even){background:var(--paper-2);}
 .faq-item:nth-child(even){background:var(--paper-2);}
 .faq-item:nth-child(even) .faq-a-inner{background:var(--paper-2);}
 .icon-btn{
@@ -169,8 +169,9 @@ tbody tr:hover{background:var(--gold-soft);}
 .stat-card.warn .num{color:var(--danger);}
 .stat-card .label{font-size:12px;color:var(--ink-soft);margin-top:2px;}
 .section-label{font-size:12.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;margin:0 0 12px;}
-.staff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;}
-.staff-card{text-align:center;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 12px;}
+.staff-rows{display:flex;flex-direction:column;gap:16px;}
+.staff-row{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;}
+.staff-card{width:168px;flex-shrink:0;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 12px;}
 .staff-photo{
   width:64px;height:64px;border-radius:50%;margin:0 auto 10px;background:var(--paper-2);
   background-size:cover;background-position:center;border:2px solid var(--gold-soft);
@@ -490,14 +491,24 @@ async function renderHome(sec){
       <div class="stat-card ${soTreHan>0?'warn':''}"><div class="num">${soTreHan}</div><div class="label">Nhiệm vụ trễ hạn</div></div>
     </div>
     <p class="section-label">Lãnh đạo và chuyên viên</p>
-    <div class="staff-grid">
-      ${staff.length ? staff.map(s=>`
-        <div class="staff-card">
-          <div class="staff-photo" style="${s.AnhDaiDien ? `background-image:url('${esc(driveThumb(s.AnhDaiDien))}')` : ''}">${s.AnhDaiDien ? '' : 'Chưa có ảnh'}</div>
-          <div class="staff-name">${esc(s.HoTen)}</div>
-          <div class="staff-role">${esc(s.ChucVu)}</div>
-        </div>`).join("") : `<div class="empty">Chưa có dữ liệu nhân sự trong sheet ThanhVienUBKT.</div>`}
+    <div class="staff-rows">
+      ${staff.length ? renderStaffRows(staff) : `<div class="empty">Chưa có dữ liệu nhân sự trong sheet ThanhVienUBKT.</div>`}
     </div>
+  `;
+}
+
+function renderStaffRows(staff){
+  const row1 = staff.slice(0,3);
+  const row2 = staff.slice(3);
+  const cardHtml = (s)=>`
+    <div class="staff-card">
+      <div class="staff-photo" style="${s.AnhDaiDien ? `background-image:url('${esc(driveThumb(s.AnhDaiDien))}')` : ''}">${s.AnhDaiDien ? '' : 'Chưa có ảnh'}</div>
+      <div class="staff-name">${esc(s.HoTen)}</div>
+      <div class="staff-role">${esc(s.ChucVu)}</div>
+    </div>`;
+  return `
+    <div class="staff-row">${row1.map(cardHtml).join("")}</div>
+    ${row2.length ? `<div class="staff-row">${row2.map(cardHtml).join("")}</div>` : ""}
   `;
 }
 
