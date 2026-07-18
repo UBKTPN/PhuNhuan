@@ -716,25 +716,26 @@ async function renderHoSo(sec){
 /* ---------- KẾ HOẠCH CÔNG TÁC ---------- */
 async function renderKeHoach(sec){
   const rows = await fetchSheet(CONFIG.SHEETS.kehoach);
-  const groups = ["Toàn khóa","Năm","Bổ sung"];
   sec.innerHTML = `
-    <p class="lede">Chương trình kiểm tra, giám sát toàn khóa, theo năm và các kế hoạch bổ sung.</p>
-    ${groups.map(g=>{
-      const items = rows.filter(r=>r.LoaiKeHoach===g);
-      if(!items.length) return "";
-      return `<p class="section-label">${g}</p><div class="card-grid" style="margin-bottom:26px">
-        ${items.map(r=>`
-          <div class="card">
-            <h4>${esc(r.Nam||g)}</h4>
-            <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 10px">${esc(r.NoiDung)}</p>
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              ${statusBadge(r.TrangThai)}
-              ${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Tải</a>` : ""}
-            </div>
-          </div>`).join("")}
-      </div>`;
-    }).join("") || `<div class="empty">Chưa có dữ liệu kế hoạch công tác.</div>`}
+    <p class="lede">Chương trình, kế hoạch, quyết định về công tác kiểm tra, giám sát.</p>
+    <div id="kehoach-list"></div>
   `;
+  if(!rows.length){
+    document.getElementById("kehoach-list").innerHTML = `<div class="empty">Chưa có dữ liệu kế hoạch công tác.</div>`;
+    return;
+  }
+  document.getElementById("kehoach-list").innerHTML = `<div class="card-grid">
+    ${rows.map(r=>`
+      <div class="card">
+        <h4>${esc(r.LoaiKeHoach)}</h4>
+        <div class="meta">Năm ${esc(r.Nam)}</div>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 10px">${esc(r.NoiDung)}</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          ${statusBadge(r.TrangThai)}
+          ${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Xem</a>` : ""}
+        </div>
+      </div>`).join("")}
+  </div>`;
 }
 
 /* ---------- KINH NGHIỆM NGHIỆP VỤ ---------- */
