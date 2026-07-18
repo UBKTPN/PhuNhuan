@@ -27,6 +27,7 @@
   --danger:#a3311f;
   --danger-bg:#f7e6e2;
   --gray-bg:#f1ede2;
+  --stripe:#f3f2ee;
   --radius:10px;
   --sidebar-w:250px;
   --topbar-strip-h:32px;
@@ -118,7 +119,20 @@ thead th{
 }
 tbody td{padding:12px 14px;font-size:13px;border-bottom:1px solid var(--line);vertical-align:top;}
 tbody tr:last-child td{border-bottom:none;}
-tbody tr:hover{background:var(--paper-2);}
+tbody tr:nth-child(even){background:var(--paper-2);}
+tbody tr:hover{background:var(--gold-soft);}
+
+.stack-row:nth-child(even){background:var(--paper-2);}
+
+.card-grid .card:nth-child(even){background:var(--paper-2);}
+.staff-grid .staff-card:nth-child(even){background:var(--paper-2);}
+.faq-item:nth-child(even){background:var(--paper-2);}
+.faq-item:nth-child(even) .faq-a-inner{background:var(--paper-2);}
+tbody tr:nth-child(even){background:var(--stripe);}
+tbody tr:nth-child(even):hover{background:var(--paper-2);}
+.stack-row:nth-child(even){background:var(--stripe);}
+.card-grid .card:nth-child(even){background:var(--stripe);}
+.faq-item:nth-child(even){background:var(--stripe);}
 .icon-btn{
   display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--card);
   border-radius:7px;padding:6px 11px;font-size:12px;cursor:pointer;color:var(--red-dark);text-decoration:none;font-weight:500;
@@ -757,20 +771,22 @@ async function renderKinhNghiem(sec){
     <div class="toolbar">
       <select class="filter" id="f-linhvuc-kn"><option value="">Tất cả lĩnh vực</option>${uniq.map(v=>`<option>${esc(v)}</option>`).join("")}</select>
     </div>
-    <div id="kn-list" class="card-grid"></div>
+    <div id="kn-list"></div>
   `;
   const draw = ()=>{
     const fv = document.getElementById("f-linhvuc-kn").value;
     const filtered = rows.filter(r=>!fv||r.LinhVucLienQuan===fv);
-    document.getElementById("kn-list").innerHTML = filtered.length ? filtered.map(r=>`
-      <div class="card">
-        <h4>${esc(r.TinhHuong)}</h4>
-        <div class="meta">${esc(r.LinhVucLienQuan)}</div>
-        <p style="font-size:12.5px;margin:8px 0 4px"><strong>Cách xử lý:</strong> ${esc(r.CachXuLy)}</p>
-        ${r.LoiThuongGap ? `<p style="font-size:12.5px;margin:4px 0"><strong>Lỗi thường gặp:</strong> ${esc(r.LoiThuongGap)}</p>` : ""}
-        ${r.BaiHocKinhNghiem ? `<p style="font-size:12.5px;margin:4px 0"><strong>Bài học:</strong> ${esc(r.BaiHocKinhNghiem)}</p>` : ""}
-        ${r.LuuY ? `<p style="font-size:12.5px;margin:4px 0;color:var(--danger)"><strong>Lưu ý:</strong> ${esc(r.LuuY)}</p>` : ""}
-      </div>`).join("") : `<div class="empty">Chưa có nội dung kinh nghiệm.</div>`;
+    document.getElementById("kn-list").innerHTML = filtered.length ? `<div class="stack-list">${filtered.map(r=>`
+      <div class="stack-row">
+        <div class="row-top">
+          <h4>${esc(r.TinhHuong)}</h4>
+          <span class="meta">${esc(r.LinhVucLienQuan)}</span>
+        </div>
+        <p><strong>Cách xử lý:</strong> ${esc(r.CachXuLy)}</p>
+        ${r.LoiThuongGap ? `<p><strong>Lỗi thường gặp:</strong> ${esc(r.LoiThuongGap)}</p>` : ""}
+        ${r.BaiHocKinhNghiem ? `<p><strong>Bài học:</strong> ${esc(r.BaiHocKinhNghiem)}</p>` : ""}
+        ${r.LuuY ? `<p style="color:var(--danger)"><strong>Lưu ý:</strong> ${esc(r.LuuY)}</p>` : ""}
+      </div>`).join("")}</div>` : `<div class="empty">Chưa có nội dung kinh nghiệm.</div>`;
   };
   document.getElementById("f-linhvuc-kn").onchange = draw;
   draw();
