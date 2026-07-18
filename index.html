@@ -131,6 +131,18 @@ tbody tr:hover{background:var(--paper-2);}
 .card h4{margin:0 0 4px;font-size:14px;font-family:'Noto Serif',serif;}
 .card .meta{font-size:11.5px;color:var(--ink-soft);margin-bottom:8px;}
 
+/* Biểu mẫu - master detail */
+.bm-layout{display:flex;gap:18px;align-items:flex-start;}
+.bm-list{width:250px;flex-shrink:0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+.bm-list-item{padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--ink);}
+.bm-list-item:last-child{border-bottom:none;}
+.bm-list-item:hover{background:var(--paper-2);}
+.bm-list-item.active{background:var(--gold);color:var(--red-dark);font-weight:600;}
+.bm-list-item .count{font-size:10.5px;background:var(--paper-2);color:var(--ink-soft);border-radius:10px;padding:1px 8px;flex-shrink:0;}
+.bm-list-item.active .count{background:rgba(0,0,0,.12);color:var(--red-dark);}
+.bm-detail{flex:1;min-width:0;}
+.bm-detail h3{font-size:15px;margin:0 0 12px;font-family:'Noto Serif',serif;}
+
 .empty, .loading{padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:13px;}
 
 /* Home */
@@ -161,8 +173,10 @@ tbody tr:hover{background:var(--paper-2);}
   display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;z-index:1;
 }
 .step-body h4{margin:2px 0 4px;font-size:14px;}
-.step-body p{margin:0 0 6px;font-size:13px;color:var(--ink-soft);line-height:1.55;}
-.step-tag{font-size:11px;color:var(--amber);}
+.step-line{margin-bottom:8px;}
+.step-line p{margin:0 0 4px;font-size:13px;color:var(--ink-soft);line-height:1.65;}
+.step-tag{font-size:11px;color:var(--amber);margin-bottom:4px;}
+.step-forms{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 8px;}
 
 /* FAQ accordion */
 .faq-item{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
@@ -506,11 +520,45 @@ async function renderVanBan(sec){
 }
 
 /* ---------- QUY TRÌNH NGHIỆP VỤ ---------- */
+function groupSteps(rows){
+  // Mỗi bước lớn chỉ có 1 dòng đầu ghi SoThuTuBuoc/TenBuoc/ThoiHan.
+  // Các dòng con bên dưới là nội dung chi tiết; dòng con nào cần đính kèm
+  // biểu mẫu thì tự nhập BieuMauLienQuan ngay tại dòng đó (không bắt buộc mọi dòng).
+  const steps = [];
+  let cur = null;
+  rows.forEach(r=>{
+    const stt = (r.SoThuTuBuoc||"").toString().trim();
+    if(stt){
+      cur = { stt, ten: r.TenBuoc||"", lines: [], thoihan: r.ThoiHan||"", cancu: r.CanCuPhapLy||"" };
+      steps.push(cur);
+    }
+    if(!cur){
+      cur = {stt:"", ten:"", lines:[], thoihan:"", cancu:""};
+      steps.push(cur);
+    }
+    if(r.ThoiHan && !cur.thoihan) cur.thoihan = r.ThoiHan;
+    if(r.CanCuPhapLy && !cur.cancu) cur.cancu = r.CanCuPhapLy;
+    if(r.NoiDungChiTiet || r.BieuMauLienQuan){
+      cur.lines.push({ text: r.NoiDungChiTiet||"", forms: parseBieuMauLinks(r.BieuMauLienQuan) });
+    }
+  });
+  return steps;
+}
+
+function parseBieuMauLinks(raw){
+  // Định dạng trong ô: "Tên mẫu 1|link1, Tên mẫu 2|link2"
+  if(!raw) return [];
+  return raw.split(",").map(s=>s.trim()).filter(Boolean).map(item=>{
+    const [ten, link] = item.split("|").map(x=>x && x.trim());
+    return {ten: ten||item, link: link||""};
+  });
+}
+
 async function renderQuyTrinh(sec){
   const rows = await fetchSheet(CONFIG.SHEETS.quytrinh);
   const names = [...new Set(rows.map(r=>r.TenQuyTrinh).filter(Boolean))];
   sec.innerHTML = `
-    <p class="lede">Các quy trình nghiệp vụ được chuẩn hóa theo từng bước thực hiện.</p>
+    <p class="lede">Các quy trình nghiệp vụ được chuẩn hóa theo từng bước thực hiện, kèm biểu mẫu áp dụng ngay tại nội dung cần dùng.</p>
     <div class="toolbar">
       <select class="filter" id="f-quytrinh">${names.map(n=>`<option>${esc(n)}</option>`).join("")}</select>
     </div>
@@ -518,16 +566,21 @@ async function renderQuyTrinh(sec){
   `;
   const draw = ()=>{
     const sel = document.getElementById("f-quytrinh").value;
-    const steps = rows.filter(r=>r.TenQuyTrinh===sel).sort((a,b)=>(Number(a.SoThuTuBuoc)||0)-(Number(b.SoThuTuBuoc)||0));
-    document.getElementById("quytrinh-steps").innerHTML = steps.length ? `<div class="step-list">${steps.map((s,i)=>`
+    const stepsRaw = rows.filter(r=>r.TenQuyTrinh===sel);
+    const steps = groupSteps(stepsRaw);
+    document.getElementById("quytrinh-steps").innerHTML = steps.length ? `<div class="step-list">${steps.map((s)=>`
       <div class="step">
-        <div class="step-num">${i+1}</div>
+        <div class="step-num">${esc(s.stt)}</div>
         <div class="step-body">
-          <h4>${esc(s.TenBuoc)}</h4>
-          <p>${esc(s.NoiDungChiTiet)}</p>
-          ${s.ThoiHan ? `<div class="step-tag">⏱ Thời hạn: ${esc(s.ThoiHan)}</div>` : ""}
-          ${s.CanCuPhapLy ? `<div class="step-tag">📖 Căn cứ: ${esc(s.CanCuPhapLy)}</div>` : ""}
-          ${s.BieuMauLienQuan ? `<div class="step-tag">📋 Biểu mẫu: ${esc(s.BieuMauLienQuan)}</div>` : ""}
+          <h4>${esc(s.ten)}</h4>
+          ${s.thoihan ? `<div class="step-tag">⏱ Thời hạn: ${esc(s.thoihan)} ngày</div>` : ""}
+          ${s.lines.map(line=>`
+            <div class="step-line">
+              ${line.text ? `<p>${esc(line.text).replace(/\n/g,"<br>")}</p>` : ""}
+              ${line.forms.length ? `<div class="step-forms">${line.forms.map(f=>`
+                <a class="icon-btn" href="${esc(f.link)}" target="_blank">${ICONS.download}${esc(f.ten)}</a>`).join("")}</div>` : ""}
+            </div>`).join("")}
+          ${s.cancu ? `<div class="step-tag">📖 Căn cứ: ${esc(s.cancu)}</div>` : ""}
         </div>
       </div>`).join("")}</div>` : `<div class="empty">Chưa có bước nào cho quy trình này.</div>`;
   };
@@ -537,27 +590,110 @@ async function renderQuyTrinh(sec){
 
 /* ---------- BIỂU MẪU ---------- */
 async function renderBieuMau(sec){
-  const rows = await fetchSheet(CONFIG.SHEETS.bieumau);
-  const uniq = (key)=>[...new Set(rows.map(r=>r[key]).filter(Boolean))];
+  const [forms, procRows] = await Promise.all([
+    fetchSheet(CONFIG.SHEETS.bieumau),
+    fetchSheet(CONFIG.SHEETS.quytrinh).catch(()=>[]),
+  ]);
+
+  // Danh sách quy trình duy nhất, theo đúng thứ tự xuất hiện trong sheet QuyTrinhNghiepVu
+  const procNames = [];
+  procRows.forEach(r=>{ if(r.TenQuyTrinh && !procNames.includes(r.TenQuyTrinh)) procNames.push(r.TenQuyTrinh); });
+  // Phòng khi có biểu mẫu gắn quy trình lạ (không có trong QuyTrinhNghiepVu) -> vẫn gom nhóm hiển thị thêm
+  [...new Set(forms.map(f=>f.ApDungChoQuyTrinh).filter(Boolean))].forEach(n=>{
+    if(!procNames.includes(n)) procNames.push(n);
+  });
+
   sec.innerHTML = `
-    <p class="lede">Toàn bộ biểu mẫu chuẩn hóa: Quyết định, Kế hoạch, Thông báo, Báo cáo, Biên bản, Đề cương.</p>
+    <p class="lede">Danh sách tra cứu nhanh toàn bộ biểu mẫu: Quyết định, Kế hoạch, Thông báo, Báo cáo, Biên bản, Đề cương. Để xem biểu mẫu áp dụng cho từng bước cụ thể, vào tab "Quy trình nghiệp vụ".</p>
     <div class="toolbar">
-      <select class="filter" id="f-loaibm"><option value="">Tất cả loại biểu mẫu</option>${uniq("LoaiBieuMau").map(v=>`<option>${esc(v)}</option>`).join("")}</select>
+      <div class="view-toggle">
+        <button id="bm-view-proc" class="active">Theo quy trình</button>
+        <button id="bm-view-all">Xem tất cả</button>
+      </div>
     </div>
-    <div id="bieumau-table"></div>
+    <div id="bm-proc-view"></div>
+    <div id="bm-all-view" style="display:none"></div>
   `;
-  const draw = ()=>{
-    const fl = document.getElementById("f-loaibm").value;
-    const filtered = rows.filter(r=>!fl||r.LoaiBieuMau===fl);
-    document.getElementById("bieumau-table").innerHTML = filtered.length ? `
-      <table><thead><tr><th>Tên biểu mẫu</th><th>Loại</th><th>Áp dụng cho quy trình</th><th>Phiên bản</th><th></th></tr></thead>
-      <tbody>${filtered.map(r=>`
-        <tr><td><strong>${esc(r.TenBieuMau)}</strong></td><td>${esc(r.LoaiBieuMau)}</td><td>${esc(r.ApDungChoQuyTrinh)}</td><td>${esc(r.PhienBan)}</td>
-        <td>${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Tải</a>` : ""}</td></tr>`).join("")}</tbody></table>
-    ` : `<div class="empty">Không có biểu mẫu phù hợp.</div>`;
+
+  /* ----- Chế độ: theo quy trình (master-detail) ----- */
+  function drawProcView(){
+    const wrap = document.getElementById("bm-proc-view");
+    if(!procNames.length){
+      wrap.innerHTML = `<div class="empty">Chưa có quy trình nào trong sheet QuyTrinhNghiepVu.</div>`;
+      return;
+    }
+    let current = procNames[0];
+    const renderDetail = ()=>{
+      const items = forms.filter(f=>f.ApDungChoQuyTrinh===current);
+      document.querySelectorAll(".bm-list-item").forEach(el=>el.classList.toggle("active", el.dataset.name===current));
+      document.getElementById("bm-detail").innerHTML = `
+        <h3>${esc(current)} <span style="font-weight:400;color:var(--ink-soft);font-size:12.5px">(${items.length} biểu mẫu)</span></h3>
+        ${items.length ? `
+          <table><thead><tr><th>Tên biểu mẫu</th><th>Loại</th><th>Phiên bản</th><th></th></tr></thead>
+          <tbody>${items.map(r=>`
+            <tr><td><strong>${esc(r.TenBieuMau)}</strong></td><td>${esc(r.LoaiBieuMau)}</td><td>${esc(r.PhienBan)}</td>
+            <td>${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Tải</a>` : ""}</td></tr>`).join("")}</tbody></table>
+        ` : `<div class="empty">Quy trình này chưa có biểu mẫu nào.</div>`}
+      `;
+    };
+    wrap.innerHTML = `
+      <div class="bm-layout">
+        <div class="bm-list">
+          ${procNames.map(n=>{
+            const c = forms.filter(f=>f.ApDungChoQuyTrinh===n).length;
+            return `<div class="bm-list-item" data-name="${esc(n)}"><span>${esc(n)}</span><span class="count">${c}</span></div>`;
+          }).join("")}
+        </div>
+        <div class="bm-detail" id="bm-detail"></div>
+      </div>
+    `;
+    wrap.querySelectorAll(".bm-list-item").forEach(el=>{
+      el.onclick = ()=>{ current = el.dataset.name; renderDetail(); };
+    });
+    renderDetail();
+  }
+
+  /* ----- Chế độ: xem tất cả (bảng + lọc, như trước) ----- */
+  function drawAllView(){
+    const uniq = (key)=>[...new Set(forms.map(r=>r[key]).filter(Boolean))];
+    const wrap = document.getElementById("bm-all-view");
+    wrap.innerHTML = `
+      <div class="toolbar">
+        <select class="filter" id="f-loaibm"><option value="">Tất cả loại biểu mẫu</option>${uniq("LoaiBieuMau").map(v=>`<option>${esc(v)}</option>`).join("")}</select>
+        <select class="filter" id="f-quytrinhbm"><option value="">Tất cả quy trình</option>${procNames.map(v=>`<option>${esc(v)}</option>`).join("")}</select>
+      </div>
+      <div id="bieumau-table"></div>
+    `;
+    const draw = ()=>{
+      const fl = document.getElementById("f-loaibm").value;
+      const fp = document.getElementById("f-quytrinhbm").value;
+      const filtered = forms.filter(r=>(!fl||r.LoaiBieuMau===fl) && (!fp||r.ApDungChoQuyTrinh===fp));
+      document.getElementById("bieumau-table").innerHTML = filtered.length ? `
+        <table><thead><tr><th>Tên biểu mẫu</th><th>Loại</th><th>Áp dụng cho quy trình</th><th>Phiên bản</th><th></th></tr></thead>
+        <tbody>${filtered.map(r=>`
+          <tr><td><strong>${esc(r.TenBieuMau)}</strong></td><td>${esc(r.LoaiBieuMau)}</td><td>${esc(r.ApDungChoQuyTrinh)}</td><td>${esc(r.PhienBan)}</td>
+          <td>${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Tải</a>` : ""}</td></tr>`).join("")}</tbody></table>
+      ` : `<div class="empty">Không có biểu mẫu phù hợp.</div>`;
+    };
+    document.getElementById("f-loaibm").onchange = draw;
+    document.getElementById("f-quytrinhbm").onchange = draw;
+    draw();
+  }
+
+  drawProcView();
+  document.getElementById("bm-view-proc").onclick = ()=>{
+    document.getElementById("bm-view-proc").classList.add("active");
+    document.getElementById("bm-view-all").classList.remove("active");
+    document.getElementById("bm-proc-view").style.display = "";
+    document.getElementById("bm-all-view").style.display = "none";
   };
-  document.getElementById("f-loaibm").onchange = draw;
-  draw();
+  document.getElementById("bm-view-all").onclick = ()=>{
+    document.getElementById("bm-view-all").classList.add("active");
+    document.getElementById("bm-view-proc").classList.remove("active");
+    document.getElementById("bm-all-view").style.display = "";
+    document.getElementById("bm-proc-view").style.display = "none";
+    drawAllView();
+  };
 }
 
 /* ---------- HỒ SƠ MẪU ---------- */
