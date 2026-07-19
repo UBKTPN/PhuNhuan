@@ -170,7 +170,7 @@ tbody tr:hover{background:var(--gold-soft);}
 .section-label{font-size:12.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;margin:0 0 12px;}
 .staff-rows{display:flex;flex-direction:column;gap:16px;}
 .staff-row{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;}
-.staff-card{width:279px;flex-shrink:0;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px 16px;}
+.staff-card{width:276px;flex-shrink:0;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px 16px;}
 .staff-photo{
   width:80px;height:80px;border-radius:50%;margin:0 auto 12px;background:var(--paper-2);
   background-size:cover;background-position:center;border:2px solid var(--gold-soft);
@@ -291,7 +291,7 @@ tbody tr:hover{background:var(--gold-soft);}
           <h1 id="pageTitle">Trang chủ</h1>
         </div>
       </div>
-      <div class="search-box">
+      <div class="search-box" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="globalSearch" type="text" placeholder="Tìm văn bản, biểu mẫu, câu hỏi...">
       </div>
@@ -380,10 +380,6 @@ PAGES.forEach(p=>{
   sec.innerHTML = `<div class="loading">Đang tải dữ liệu...</div>`;
   content.appendChild(sec);
 });
-const searchSec = document.createElement("section");
-searchSec.className = "page";
-searchSec.id = "page-search";
-content.appendChild(searchSec);
 
 const loaded = {}; // cache: sheetName -> rows
 let currentPageId = "home";
@@ -393,6 +389,15 @@ function showPage(id){
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active", b.dataset.page===id));
   document.querySelectorAll(".page").forEach(s=>s.classList.toggle("active", s.id==="page-"+id));
   document.getElementById("pageTitle").textContent = PAGES.find(p=>p.id===id).label;
+  const searchBox = document.querySelector(".search-box");
+  const searchInputEl = document.getElementById("globalSearch");
+  searchInputEl.value = "";
+  if(id==="home"){
+    searchBox.style.display = "none";
+  }else{
+    searchBox.style.display = "";
+    searchInputEl.placeholder = SEARCH_PLACEHOLDERS[id] || "Tìm kiếm...";
+  }
   renderPage(id);
 }
 
@@ -485,6 +490,28 @@ function esc(s){
   return (s===undefined||s===null) ? "" : String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 }
 
+/* Ô tìm kiếm tổng ở góc trên chỉ để hiển thị — không còn ảnh hưởng đến
+   bất kỳ tab nào. Luôn trả về chuỗi rỗng để các bộ lọc trong từng tab
+   hoạt động bình thường, không bị ô này can thiệp. */
+const pageRedraw = {};
+function getSearchQuery(){
+  return "";
+}
+function matchAny(fields, q){
+  if(!q) return true;
+  return fields.some(v=>(v||"").toString().toLowerCase().includes(q));
+}
+const SEARCH_PLACEHOLDERS = {
+  vanban: "Tìm theo tên văn bản, số hiệu...",
+  quytrinh: "Tìm nội dung trong các bước...",
+  bieumau: "Tìm theo tên biểu mẫu...",
+  hoso: "Tìm theo tên hồ sơ, cuộc giám sát...",
+  kehoach: "Tìm theo tên kế hoạch, nội dung...",
+  kinhnghiem: "Tìm theo tình huống, cách xử lý...",
+  cauhoi: "Tìm câu hỏi, câu trả lời...",
+  lich: "Tìm theo nhiệm vụ, người phụ trách...",
+};
+
 function statusBadge(status){
   const s = (status||"").toLowerCase();
   if(s.includes("trễ")) return `<span class="badge danger">${esc(status)}</span>`;
@@ -576,7 +603,9 @@ async function renderVanBan(sec){
     const fl = document.getElementById("f-loai").value;
     const fv = document.getElementById("f-linhvuc").value;
     const fh = document.getElementById("f-hieuluc").value;
-    const filtered = rows.filter(r=> (!fl||r.LoaiVanBan===fl) && (!fv||r.LinhVuc===fv) && (!fh||r.TinhTrangHieuLuc===fh));
+    const q = getSearchQuery();
+    const filtered = rows.filter(r=> (!fl||r.LoaiVanBan===fl) && (!fv||r.LinhVuc===fv) && (!fh||r.TinhTrangHieuLuc===fh)
+      && matchAny([r.TenVanBan, r.SoHieu, r.CoQuanBanHanh, r.GhiChu], q));
     document.getElementById("vanban-table").innerHTML = filtered.length ? `
       <table><thead><tr><th>Tên văn bản</th><th>Số hiệu</th><th>Ngày ban hành</th><th>Cơ quan ban hành</th><th>Tình trạng</th><th></th></tr></thead>
       <tbody>${filtered.map(r=>`
@@ -588,9 +617,10 @@ async function renderVanBan(sec){
           <td>${statusBadge(r.TinhTrangHieuLuc)}</td>
           <td>${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Tải</a>` : ""}</td>
         </tr>`).join("")}</tbody></table>
-    ` : `<div class="empty">Không có văn bản phù hợp bộ lọc.</div>`;
+    ` : `<div class="empty">Không có văn bản phù hợp.</div>`;
   };
   ["f-loai","f-linhvuc","f-hieuluc"].forEach(id=>document.getElementById(id).onchange=draw);
+  pageRedraw.vanban = draw;
   draw();
 }
 
@@ -642,7 +672,14 @@ async function renderQuyTrinh(sec){
   const draw = ()=>{
     const sel = document.getElementById("f-quytrinh").value;
     const stepsRaw = rows.filter(r=>r.TenQuyTrinh===sel);
-    const steps = groupSteps(stepsRaw);
+    let steps = groupSteps(stepsRaw);
+    const q = getSearchQuery();
+    if(q){
+      steps = steps.map(s=>{
+        const tenMatch = (s.ten||"").toLowerCase().includes(q);
+        return {...s, lines: tenMatch ? s.lines : s.lines.filter(line=>(line.text||"").toLowerCase().includes(q))};
+      }).filter(s=> (s.ten||"").toLowerCase().includes(q) || s.lines.length);
+    }
     document.getElementById("quytrinh-steps").innerHTML = steps.length ? `<div class="step-list">${steps.map((s)=>`
       <div class="step">
         <div class="step-num">${esc(s.stt)}</div>
@@ -657,9 +694,10 @@ async function renderQuyTrinh(sec){
             </div>`).join("")}
           ${s.cancu ? `<div class="step-tag">📖 Căn cứ: ${esc(s.cancu)}</div>` : ""}
         </div>
-      </div>`).join("")}</div>` : `<div class="empty">Chưa có bước nào cho quy trình này.</div>`;
+      </div>`).join("")}</div>` : `<div class="empty">Không tìm thấy nội dung phù hợp.</div>`;
   };
   document.getElementById("f-quytrinh").onchange = draw;
+  pageRedraw.quytrinh = draw;
   if(names.length) draw(); else document.getElementById("quytrinh-steps").innerHTML = `<div class="empty">Chưa có dữ liệu quy trình.</div>`;
 }
 
@@ -691,6 +729,7 @@ async function renderBieuMau(sec){
   `;
 
   /* ----- Chế độ: theo quy trình (master-detail) ----- */
+  let refreshCurrentView = ()=>{};
   function drawProcView(){
     const wrap = document.getElementById("bm-proc-view");
     if(!procNames.length){
@@ -699,7 +738,8 @@ async function renderBieuMau(sec){
     }
     let current = procNames[0];
     const renderDetail = ()=>{
-      const items = forms.filter(f=>f.ApDungChoQuyTrinh===current);
+      const q = getSearchQuery();
+      const items = forms.filter(f=>f.ApDungChoQuyTrinh===current && matchAny([f.TenBieuMau, f.LoaiBieuMau], q));
       document.querySelectorAll(".bm-list-item").forEach(el=>el.classList.toggle("active", el.dataset.name===current));
       document.getElementById("bm-detail").innerHTML = `
         <h3>${esc(current)} <span style="font-weight:400;color:var(--ink-soft);font-size:12.5px">(${items.length} biểu mẫu)</span></h3>
@@ -708,7 +748,7 @@ async function renderBieuMau(sec){
           <tbody>${items.map(r=>`
             <tr><td><strong>${esc(r.TenBieuMau)}</strong></td><td>${esc(r.LoaiBieuMau)}</td><td>${esc(r.PhienBan)}</td>
             <td>${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Tải</a>` : ""}</td></tr>`).join("")}</tbody></table>
-        ` : `<div class="empty">Quy trình này chưa có biểu mẫu nào.</div>`}
+        ` : `<div class="empty">Không có biểu mẫu phù hợp.</div>`}
       `;
     };
     wrap.innerHTML = `
@@ -725,6 +765,7 @@ async function renderBieuMau(sec){
     wrap.querySelectorAll(".bm-list-item").forEach(el=>{
       el.onclick = ()=>{ current = el.dataset.name; renderDetail(); };
     });
+    refreshCurrentView = renderDetail;
     renderDetail();
   }
 
@@ -742,7 +783,9 @@ async function renderBieuMau(sec){
     const draw = ()=>{
       const fl = document.getElementById("f-loaibm").value;
       const fp = document.getElementById("f-quytrinhbm").value;
-      const filtered = forms.filter(r=>(!fl||r.LoaiBieuMau===fl) && (!fp||r.ApDungChoQuyTrinh===fp));
+      const q = getSearchQuery();
+      const filtered = forms.filter(r=>(!fl||r.LoaiBieuMau===fl) && (!fp||r.ApDungChoQuyTrinh===fp)
+        && matchAny([r.TenBieuMau, r.LoaiBieuMau, r.ApDungChoQuyTrinh], q));
       document.getElementById("bieumau-table").innerHTML = filtered.length ? `
         <table><thead><tr><th>Tên biểu mẫu</th><th>Loại</th><th>Áp dụng cho quy trình</th><th>Phiên bản</th><th></th></tr></thead>
         <tbody>${filtered.map(r=>`
@@ -752,9 +795,11 @@ async function renderBieuMau(sec){
     };
     document.getElementById("f-loaibm").onchange = draw;
     document.getElementById("f-quytrinhbm").onchange = draw;
+    refreshCurrentView = draw;
     draw();
   }
 
+  pageRedraw.bieumau = ()=> refreshCurrentView();
   drawProcView();
   document.getElementById("bm-view-proc").onclick = ()=>{
     document.getElementById("bm-view-proc").classList.add("active");
@@ -776,16 +821,23 @@ async function renderHoSo(sec){
   const rows = await fetchSheet(CONFIG.SHEETS.hoso);
   sec.innerHTML = `
     <p class="lede">Hồ sơ hoàn chỉnh đã được nghiệm thu cho từng cuộc giám sát: Kế hoạch, Đề cương, Quyết định, Giấy mời, Biên bản, Báo cáo, Thông báo kết luận.</p>
-    <div class="card-grid">
-      ${rows.length ? rows.map(r=>`
+    <div id="hoso-list"></div>
+  `;
+  const draw = ()=>{
+    const q = getSearchQuery();
+    const filtered = rows.filter(r=>matchAny([r.TenCuocGiamSat, r.DanhSachTaiLieu], q));
+    document.getElementById("hoso-list").innerHTML = filtered.length ? `<div class="card-grid">
+      ${filtered.map(r=>`
         <div class="card">
           <h4>${esc(r.TenCuocGiamSat)}</h4>
           <div class="meta">Năm ${esc(r.NamThucHien)}</div>
           <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 10px">${esc(r.DanhSachTaiLieu)}</p>
           ${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.external}Xem hồ sơ</a>` : ""}
-        </div>`).join("") : `<div class="empty">Chưa có hồ sơ mẫu.</div>`}
-    </div>
-  `;
+        </div>`).join("")}
+    </div>` : `<div class="empty">Không có hồ sơ phù hợp.</div>`;
+  };
+  pageRedraw.hoso = draw;
+  draw();
 }
 
 /* ---------- KẾ HOẠCH CÔNG TÁC ---------- */
@@ -795,24 +847,26 @@ async function renderKeHoach(sec){
     <p class="lede">Chương trình, kế hoạch, quyết định về công tác kiểm tra, giám sát.</p>
     <div id="kehoach-list"></div>
   `;
-  if(!rows.length){
-    document.getElementById("kehoach-list").innerHTML = `<div class="empty">Chưa có dữ liệu kế hoạch công tác.</div>`;
-    return;
-  }
-  document.getElementById("kehoach-list").innerHTML = `<div class="stack-list">
-    ${rows.map(r=>`
-      <div class="stack-row">
-        <div class="row-top">
-          <h4>${esc(r.LoaiKeHoach)}</h4>
-          <span class="meta">Năm ${esc(r.Nam)}</span>
-        </div>
-        <p>${esc(r.NoiDung)}</p>
-        <div class="row-bottom">
-          ${statusBadge(r.TrangThai)}
-          ${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Xem</a>` : ""}
-        </div>
-      </div>`).join("")}
-  </div>`;
+  const draw = ()=>{
+    const q = getSearchQuery();
+    const filtered = rows.filter(r=>matchAny([r.LoaiKeHoach, r.NoiDung], q));
+    document.getElementById("kehoach-list").innerHTML = filtered.length ? `<div class="stack-list">
+      ${filtered.map(r=>`
+        <div class="stack-row">
+          <div class="row-top">
+            <h4>${esc(r.LoaiKeHoach)}</h4>
+            <span class="meta">Năm ${esc(r.Nam)}</span>
+          </div>
+          <p>${esc(r.NoiDung)}</p>
+          <div class="row-bottom">
+            ${statusBadge(r.TrangThai)}
+            ${r.LinkDrive ? `<a class="icon-btn" href="${esc(r.LinkDrive)}" target="_blank">${ICONS.download}Xem</a>` : ""}
+          </div>
+        </div>`).join("")}
+    </div>` : `<div class="empty">Không có kế hoạch phù hợp.</div>`;
+  };
+  pageRedraw.kehoach = draw;
+  draw();
 }
 
 /* ---------- KINH NGHIỆM NGHIỆP VỤ ---------- */
@@ -828,7 +882,9 @@ async function renderKinhNghiem(sec){
   `;
   const draw = ()=>{
     const fv = document.getElementById("f-linhvuc-kn").value;
-    const filtered = rows.filter(r=>!fv||r.LinhVucLienQuan===fv);
+    const q = getSearchQuery();
+    const filtered = rows.filter(r=>(!fv||r.LinhVucLienQuan===fv)
+      && matchAny([r.TinhHuong, r.CachXuLy, r.LoiThuongGap, r.BaiHocKinhNghiem], q));
     document.getElementById("kn-list").innerHTML = filtered.length ? `<div class="stack-list">${filtered.map(r=>`
       <div class="stack-row">
         <div class="row-top">
@@ -839,9 +895,10 @@ async function renderKinhNghiem(sec){
         ${r.LoiThuongGap ? `<p><strong>Lỗi thường gặp:</strong> ${esc(r.LoiThuongGap)}</p>` : ""}
         ${r.BaiHocKinhNghiem ? `<p><strong>Bài học:</strong> ${esc(r.BaiHocKinhNghiem)}</p>` : ""}
         ${r.LuuY ? `<p style="color:var(--danger)"><strong>Lưu ý:</strong> ${esc(r.LuuY)}</p>` : ""}
-      </div>`).join("")}</div>` : `<div class="empty">Chưa có nội dung kinh nghiệm.</div>`;
+      </div>`).join("")}</div>` : `<div class="empty">Không có nội dung phù hợp.</div>`;
   };
   document.getElementById("f-linhvuc-kn").onchange = draw;
+  pageRedraw.kinhnghiem = draw;
   draw();
 }
 
@@ -850,17 +907,16 @@ async function renderCauHoi(sec){
   const rows = await fetchSheet(CONFIG.SHEETS.cauhoi);
   const topics = [...new Set(rows.map(r=>r.ChuDe).filter(Boolean))];
   sec.innerHTML = `
-    <p class="lede">Bộ câu hỏi thường gặp trong nghiệp vụ kiểm tra, giám sát (${rows.length} câu hỏi).</p>
+    <p class="lede">Bộ câu hỏi thường gặp trong nghiệp vụ kiểm tra, giám sát (${rows.length} câu hỏi). Gõ từ khóa vào ô tìm kiếm phía trên để lọc.</p>
     <div class="toolbar">
-      <input class="filter" id="f-search-ch" type="text" placeholder="Tìm câu hỏi..." style="min-width:220px">
       <select class="filter" id="f-chude"><option value="">Tất cả chủ đề</option>${topics.map(v=>`<option>${esc(v)}</option>`).join("")}</select>
     </div>
     <div id="ch-list"></div>
   `;
   const draw = ()=>{
-    const q = document.getElementById("f-search-ch").value.toLowerCase();
+    const q = getSearchQuery();
     const ct = document.getElementById("f-chude").value;
-    const filtered = rows.filter(r=> (!ct||r.ChuDe===ct) && (!q || (r.CauHoi||"").toLowerCase().includes(q)) );
+    const filtered = rows.filter(r=> (!ct||r.ChuDe===ct) && matchAny([r.CauHoi, r.CauTraLoi], q));
     document.getElementById("ch-list").innerHTML = filtered.length ? filtered.map((r,i)=>`
       <div class="faq-item">
         <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
@@ -873,8 +929,8 @@ async function renderCauHoi(sec){
         </div></div>
       </div>`).join("") : `<div class="empty">Không tìm thấy câu hỏi phù hợp.</div>`;
   };
-  document.getElementById("f-search-ch").oninput = draw;
   document.getElementById("f-chude").onchange = draw;
+  pageRedraw.cauhoi = draw;
   draw();
 }
 
@@ -904,20 +960,25 @@ async function renderLich(sec){
       <div id="lich-detail" class="task-detail" style="display:none"></div>
     </div>
   `;
-  document.getElementById("lich-table").innerHTML = rows.length ? `
-    <table><thead><tr><th>Nhiệm vụ</th><th>Đơn vị</th><th>Người phụ trách</th><th>Bắt đầu</th><th>Hoàn thành</th><th>Hồ sơ nộp</th><th>Trạng thái</th></tr></thead>
-    <tbody>${rows.map((r,i)=>`
-      <tr onclick="openLichTask(${i})" style="cursor:pointer">
-      <td><strong>${esc(r.TenNhiemVu)}</strong></td><td>${esc(r.DonViThucHien)}</td><td>${esc(r.NguoiPhuTrach)}</td>
-      <td>${esc(r.NgayBatDau)}</td><td>${esc(r.NgayHoanThanh)}</td><td>${esc(r.HoSoPhaiNop)}</td><td>${statusBadge(r.TrangThai)}</td></tr>`).join("")}</tbody></table>
-  ` : `<div class="empty">Chưa có dữ liệu lịch công việc.</div>`;
+  const drawTable = ()=>{
+    const q = getSearchQuery();
+    const filtered = rows.map((r,i)=>({r,i})).filter(({r})=>matchAny([r.TenNhiemVu, r.NguoiPhuTrach, r.DonViThucHien, r.HoSoPhaiNop], q));
+    document.getElementById("lich-table").innerHTML = filtered.length ? `
+      <table><thead><tr><th>Nhiệm vụ</th><th>Đơn vị</th><th>Người phụ trách</th><th>Bắt đầu</th><th>Hoàn thành</th><th>Hồ sơ nộp</th><th>Trạng thái</th></tr></thead>
+      <tbody>${filtered.map(({r,i})=>`
+        <tr onclick="openLichTask(${i})" style="cursor:pointer">
+        <td><strong>${esc(r.TenNhiemVu)}</strong></td><td>${esc(r.DonViThucHien)}</td><td>${esc(r.NguoiPhuTrach)}</td>
+        <td>${esc(r.NgayBatDau)}</td><td>${esc(r.NgayHoanThanh)}</td><td>${esc(r.HoSoPhaiNop)}</td><td>${statusBadge(r.TrangThai)}</td></tr>`).join("")}</tbody></table>
+    ` : `<div class="empty">Không có nhiệm vụ phù hợp.</div>`;
+  };
+  drawTable();
 
   const drawCal = ()=>{
     const sel = document.getElementById("f-thang").value;
     document.getElementById("lich-detail").style.display = "none";
     if(!sel){ document.getElementById("cal-grid-wrap").innerHTML = `<div class="empty">Chưa có dữ liệu để hiển thị lịch.</div>`; return; }
     const [y,m] = sel.split("-").map(Number);
-    document.getElementById("cal-grid-wrap").innerHTML = buildCalendar(rows, y, m);
+    document.getElementById("cal-grid-wrap").innerHTML = buildCalendar(rows, y, m, getSearchQuery());
   };
 
   document.getElementById("btn-view-table").onclick = ()=>{
@@ -926,6 +987,7 @@ async function renderLich(sec){
     document.getElementById("lich-table").style.display = "";
     document.getElementById("lich-cal").style.display = "none";
     document.getElementById("f-thang").style.display = "none";
+    drawTable();
   };
   document.getElementById("btn-view-cal").onclick = ()=>{
     document.getElementById("btn-view-cal").classList.add("active");
@@ -936,6 +998,11 @@ async function renderLich(sec){
     drawCal();
   };
   document.getElementById("f-thang").onchange = drawCal;
+
+  pageRedraw.lich = ()=>{
+    const calMode = document.getElementById("lich-cal").style.display !== "none";
+    if(calMode) drawCal(); else drawTable();
+  };
 }
 
 function getMonthOptions(rows){
@@ -1011,7 +1078,7 @@ function parseVNDate(s){
   return isNaN(dt) ? null : dt;
 }
 
-function buildCalendar(rows, year, month){
+function buildCalendar(rows, year, month, q){
   // month: 1-12
   const first = new Date(year, month-1, 1);
   const startDow = first.getDay();
@@ -1020,6 +1087,7 @@ function buildCalendar(rows, year, month){
   rows.forEach((r,idx)=>{
     const dt = parseVNDate(r.NgayHoanThanh);
     if(dt && dt.getFullYear()===year && dt.getMonth()===month-1){
+      if(q && !matchAny([r.TenNhiemVu, r.NguoiPhuTrach, r.DonViThucHien, r.HoSoPhaiNop], q)) return;
       const d = dt.getDate();
       (byDay[d] = byDay[d]||[]).push({idx, name: r.TenNhiemVu});
     }
@@ -1033,64 +1101,6 @@ function buildCalendar(rows, year, month){
   }
   return `<p class="section-label">Tháng ${month}/${year} — nhiệm vụ theo ngày hoàn thành</p><div class="cal-grid">${cells}</div>`;
 }
-
-/* ---------- GLOBAL SEARCH (tìm xuyên suốt Văn bản + Biểu mẫu + Câu hỏi) ---------- */
-function searchResultItem(title, sub, targetPage){
-  return `<div class="search-hit" data-target="${targetPage}"><div class="sh-title">${esc(title)}</div>${sub?`<div class="sh-sub">${esc(sub)}</div>`:""}</div>`;
-}
-
-async function renderSearch(query){
-  document.getElementById("pageTitle").textContent = `Kết quả tìm kiếm: "${query}"`;
-  document.querySelectorAll(".page").forEach(s=>s.classList.remove("active"));
-  const sec = document.getElementById("page-search");
-  sec.classList.add("active");
-  sec.innerHTML = `<div class="loading">Đang tìm...</div>`;
-
-  const [vanban, bieumau, cauhoi] = await Promise.all([
-    fetchSheet(CONFIG.SHEETS.vanban).catch(()=>[]),
-    fetchSheet(CONFIG.SHEETS.bieumau).catch(()=>[]),
-    fetchSheet(CONFIG.SHEETS.cauhoi).catch(()=>[]),
-  ]);
-  const q = query.toLowerCase();
-  const hitVanBan = vanban.filter(r=>(r.TenVanBan||"").toLowerCase().includes(q));
-  const hitBieuMau = bieumau.filter(r=>(r.TenBieuMau||"").toLowerCase().includes(q));
-  const hitCauHoi = cauhoi.filter(r=>(r.CauHoi||"").toLowerCase().includes(q));
-  const total = hitVanBan.length + hitBieuMau.length + hitCauHoi.length;
-
-  const group = (title, icon, items, mapFn, targetPage)=>`
-    <div class="search-group">
-      <div class="search-group-title">${ICONS[icon]}${title} <span class="count">${items.length}</span></div>
-      ${items.length ? items.slice(0,20).map(mapFn).map(([t,s])=>searchResultItem(t,s,targetPage)).join("") : `<div class="empty" style="padding:16px 0">Không có kết quả phù hợp.</div>`}
-    </div>`;
-
-  sec.innerHTML = `
-    <p class="lede">Tìm thấy ${total} kết quả cho "${esc(query)}" trong Văn bản, Biểu mẫu và Câu hỏi nghiệp vụ.</p>
-    ${group("Văn bản quy phạm", "doc", hitVanBan, r=>[r.TenVanBan, `${r.LoaiVanBan||""} · ${r.SoHieu||""}`], "vanban")}
-    ${group("Biểu mẫu", "form", hitBieuMau, r=>[r.TenBieuMau, r.LoaiBieuMau], "bieumau")}
-    ${group("Câu hỏi nghiệp vụ", "question", hitCauHoi, r=>[r.CauHoi, r.ChuDe], "cauhoi")}
-  `;
-  sec.querySelectorAll(".search-hit").forEach(el=>{
-    el.onclick = ()=>{
-      document.getElementById("globalSearch").value = "";
-      showPage(el.dataset.target);
-    };
-  });
-}
-
-let searchDebounce = null;
-const searchInput = document.getElementById("globalSearch");
-searchInput.addEventListener("input", (e)=>{
-  const q = e.target.value.trim();
-  clearTimeout(searchDebounce);
-  if(!q){
-    showPage(currentPageId);
-    return;
-  }
-  searchDebounce = setTimeout(()=>renderSearch(q), 250);
-});
-searchInput.addEventListener("keydown", (e)=>{
-  if(e.key==="Enter"){ e.preventDefault(); const q = e.target.value.trim(); if(q){ clearTimeout(searchDebounce); renderSearch(q); } }
-});
 
 /* ---------- ĐỒNG HỒ THỜI GIAN THỰC ---------- */
 const DOW_VN = ["Chủ nhật","Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Thứ Sáu","Thứ Bảy"];
